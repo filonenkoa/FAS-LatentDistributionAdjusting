@@ -1,22 +1,23 @@
+from box import Box
 import torch
-import timm
 import torch.nn as nn
+from models import get_backbone
 from models.utils import cos_simularity
 from models.loss import *
-    
-class LDAModel(nn.Module):
-    def __init__(self, n_prototypes, n_features, n_classes) -> None:
-        super().__init__()
-        self.backbone = timm.create_model('resnet18.a1_in1k', pretrained=True, num_classes=0)
-        self.fc = nn.Linear(2048, n_features)
-        self.classifier = nn.Linear(n_features, n_classes)
-        self.pos_prototype = nn.Parameter(torch.rand(n_features, n_prototypes))
-        self.neg_prototype = nn.Parameter(torch.rand(n_features, n_prototypes))
+from reporting import report
+
+
+class LDAModel(nn.Module):        
+    def __init__(self, config: Box) -> None:
+        super().__init__(config=config)
+        self.backbone: nn.Module = get_backbone(config)
+        self.classifier = nn.Linear(config.model.descriptor_size, config.model.num_classes)
+        self.pos_prototype = nn.Parameter(torch.rand(config.model.descriptor_size, config.model.num_prototypes))
+        self.neg_prototype = nn.Parameter(torch.rand(config.model.descriptor_size, config.model.num_prototypes))
         self.self_check()
-    
+
     def forward(self, x):
         x = self.backbone(x)
-        x = self.fc(x)
         pos_dist = torch.acos(cos_simularity(x, self.pos_prototype))
         neg_dist = torch.acos(cos_simularity(x, self.neg_prototype))
         x = self.classifier(x)
@@ -38,5 +39,5 @@ class LDAModel(nn.Module):
         _ = inter_loss(pos, neg)
         _ = intra_loss(pos, neg)
         _ = data_loss(dist, y)
-        print('Model feedforward check passed.')
+        report(f'Rank {self.config.world_rank}: Model feedforward check passed.')
 
