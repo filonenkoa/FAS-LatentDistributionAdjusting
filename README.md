@@ -12,7 +12,7 @@ The code base is rewritten from PyTorch Lightning to vanilla PyTorch to ensure t
 - [x] TurboJPEG support for faster image decoding
 - [x] Multiple datasets training
 - [x] Compute FAS-related metrics (ACER, etc.)
-- [s] Telegram reports
+- [x] Telegram reports
 - [x] Compute metrics for each val dataset separately
 - [x] Split validation into miltiple GPUs
 - [x] Balanced sampler suitable for DDP
