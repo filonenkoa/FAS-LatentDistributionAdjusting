@@ -11,4 +11,6 @@ tqdm
 ptflops
 python-box
 python-dotenv
-turbojpeg
+PyTurboJPEG
+tensorboard
+timm==0.6.13

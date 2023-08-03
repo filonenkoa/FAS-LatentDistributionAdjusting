@@ -20,6 +20,7 @@ class EfficientFormerV2Backbone(BaseModel):
     """
     
     PRETRAINED_FILE_NAMES = {
+        "S0": "eformer_s0_450.pth",
         "S1": "eformer_s1_450.pth"
     }
     

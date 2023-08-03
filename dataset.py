@@ -37,8 +37,8 @@ class FASDataset(Dataset):
     def __getitem__(self, index):
         # label = self.data.iloc[index, 1]
         label = self.labels[index]
-        label = np.array([label], dtype=np.float32)
-        label = np.expand_dims(label, axis=0)
+        # label = np.array([label], dtype=np.float32)
+        # label = np.expand_dims(label, axis=0)
         
         if self.return_images:
             img_name = Path(self.root_dir, self.data.iloc[index, 0])
@@ -49,11 +49,10 @@ class FASDataset(Dataset):
                 img = cv2.imread(img_name.as_posix()) 
 
             if self.transform:
-                img1 = self.transform(image=img)
-                if self.is_train:
-                    img2 = self.transform(image=img)
-                    return img1["image"], img2["image"], label
-            return img1["image"], label
+                img = self.transform(image=img)
+                return img["image"], label
+            else:
+                return img, label
         else:
             return None, label
     

@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import datetime
+import math
 
 import os
 import os.path as osp
@@ -18,12 +19,14 @@ import json
 from box import Box
 from loguru import logger
 from albumentations import Compose
+from dataset import ConcatDatasetWithLabels, FASDataset
 from models import build_network, load_checkpoint
 from optimizers import get_optimizer
 
 from reporting import report
 from samplers import DistributedBalancedSampler
 from schedulers import init_scheduler
+from trainer import Trainer
 from transforms import get_transforms
 
 
@@ -31,10 +34,9 @@ def get_config() -> Box:
     parser = ArgumentParser(description='Latent Distribution Adjusting for Face Anti-Spoofing training')
     parser.add_argument('--config', type=str, help='Name of the configuration (.yaml) file')
     args = parser.parse_args()
-    config_path = Path("config", args.config)
+    config_path = Path("configs", args.config)
     assert config_path.is_file(), f"Configuration file {config_path} does not exist"
     config = read_cfg(cfg_file=config_path.as_posix())
-    config.log_root = config.log_dir
     config.config_path = config_path
     return config
 
@@ -67,8 +69,7 @@ def init_libraries(config: Box) -> None:
         torch.backends.cudnn.allow_tf32 = False
     
     config.device = torch.device("cuda")
-    torch.cuda.set_device(f"cuda:{config.local_rank}")
-    report(f"Rank {config.local_rank}. Set device {config.device}")
+    config.device_name = torch.device("cuda")  # hardcoded, no CPU/HPU support
 
 
 def init_communication(config: Box) -> None:
@@ -91,8 +92,10 @@ def init_communication(config: Box) -> None:
                 world_size=config.world_size,
                 rank=config.world_rank
                 )
+    torch.cuda.set_device(f"cuda:{config.local_rank}")
+    # report(f"Rank {config.local_rank}. Set device {config.device}")
     
-    logger.info(f"DEVICE: {config.device_name}\tWORLD: {config.world_size}\tLOCAL_RANK: {config.local_rank}\tWORLD_RANK: {config.world_rank}")
+    report(f"DEVICE: {config.device_name}\tWORLD: {config.world_size}\tLOCAL_RANK: {config.local_rank}\tWORLD_RANK: {config.world_rank}")
     os.environ["ID"] = str(config.local_rank)
     os.environ["LOCAL_RANK"] = str(config.local_rank)
 
@@ -110,26 +113,26 @@ def get_dataloaders(config: Box) -> Tuple[DataLoader, List[DataLoader]]:
     val_datasets = get_val_sets(config, val_transform)
 
     sampler = None
-    if config.world_size > 1:
-        if config.train.balanced_sampler:
-            sampler = DistributedBalancedSampler(
+    
+    if config.train.balanced_sampler:
+        sampler = DistributedBalancedSampler(
                 dataset=train_dataset,
                 num_replicas=config.world_size,
                 rank=config.world_rank,
                 shuffle=True,
                 seed=config.seed,
                 drop_last=False)
-        else:
-            sampler = torch.utils.data.distributed.DistributedSampler(
-                dataset = train_dataset,
-                shuffle = True,
-                seed=config.seed,
-                drop_last=True
-            )
+    elif config.world_size > 1:
+        sampler = torch.utils.data.distributed.DistributedSampler(
+            dataset = train_dataset,
+            shuffle = True,
+            seed=config.seed,
+            drop_last=True
+        )
 
     train_loader = DataLoader(
         dataset=train_dataset,
-        batch_size=config['train']['batch_size'],
+        batch_size=config.train.batch_size,
         shuffle=True if sampler is None else False,
         num_workers=config.dataset.num_workers,
         sampler=sampler
@@ -217,7 +220,6 @@ def cli_main():
 
     # build model and engine
     state_dict = load_checkpoint(config)
-    # model_state_dict =  state_dict["model"] if "model" in state_dict.keys() else None
     model = build_network(config, state_dict)
     model.to(config.device)
     optimizer = get_optimizer(config, model, state_dict.get("optimizer"))
@@ -244,18 +246,6 @@ def cli_main():
     trainer.train()
     if writer is not None:
         writer.close()
-    
-    # ------------
-    # model
-    # ------------
-    model = LDA_PL(epoch=args.epoch, hyp=hyp)
-    ckpt_path = 'results'
-    if not os.path.exists(ckpt_path):
-        os.makedirs(ckpt_path)
-    exists_results = len(os.listdir(ckpt_path))
-    ckpt_path = os.path.join(ckpt_path, str(exists_results))
-    if not os.path.exists(ckpt_path):
-        os.makedirs(ckpt_path)
 
 
 if __name__ == '__main__':

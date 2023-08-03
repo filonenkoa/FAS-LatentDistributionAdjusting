@@ -1,15 +1,15 @@
 from box import Box
 import torch
 import torch.nn as nn
-from models import get_backbone
-from models.utils import cos_simularity
+from models.utils import cos_simularity, get_backbone
 from models.loss import *
 from reporting import report
 
 
 class LDAModel(nn.Module):        
     def __init__(self, config: Box) -> None:
-        super().__init__(config=config)
+        super().__init__()
+        self.config = config
         self.backbone: nn.Module = get_backbone(config)
         self.classifier = nn.Linear(config.model.descriptor_size, config.model.num_classes)
         self.pos_prototype = nn.Parameter(torch.rand(config.model.descriptor_size, config.model.num_prototypes))

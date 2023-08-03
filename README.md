@@ -9,15 +9,14 @@ The code base is rewritten from PyTorch Lightning to vanilla PyTorch to ensure t
 - [x] EfficientFormerV2 support
 - [x] Use config files
 - [x] Data augmentations
-- [ ] TurboJPEG support for faster image decoding
-- [ ] Multiple datasets training
-- [ ] Utility to convert datasets
-- [ ] Compute FAS-related metrics (ACER, etc.)
-- [ ] Incorporate loss into a model (the whole inference can be exported to a single ONNX file)
-- [ ] Telegram reports
-- [ ] Compute metrics for each val dataset separately
-- [ ] Split validation into miltiple GPUs
-- [ ] Balanced sampler suitable for DDP
+- [x] TurboJPEG support for faster image decoding
+- [x] Multiple datasets training
+- [x] Compute FAS-related metrics (ACER, etc.)
+- [s] Telegram reports
+- [x] Compute metrics for each val dataset separately
+- [x] Split validation into miltiple GPUs
+- [x] Balanced sampler suitable for DDP
+- [ ] FP16/AMP support
 - [ ] Conversion to ONNX
 
 ## How to use

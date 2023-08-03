@@ -6,14 +6,13 @@ import torch
 from ptflops import get_model_complexity_info
 from torch.nn.parallel import DistributedDataParallel as DDP
 from functools import partial
-
 from pathlib import Path
-from metrics.losses import PatchLoss
 
-from models.patchnet_model import PatchnetModel
-from reporting import report
 sys.path.append(Path(__file__).resolve().parent.as_posix())
 sys.path.append(Path(__file__).resolve().parents[1].as_posix())
+from models.LDA import LDAModel
+from reporting import report
+
 
 def models_weights_difference_ratio(model_1: torch.nn.Module, model_2: torch.nn.Module) -> float:
     models_differ = 0
@@ -30,16 +29,6 @@ def models_weights_difference_ratio(model_1: torch.nn.Module, model_2: torch.nn.
                 print(f"Mismtach in keys found at {key_item_1[0]}. Are models the same?")
                 raise Exception
     return models_differ / total_items
-
-
-def get_backbone(config: Box) -> torch.nn.Module:
-    if config.model.base == "efficientformerv2_s0":
-        from efficientformer import EFFICIENTFORMER_V2_S0 as Backbone
-    elif config.model.base == "efficientformerv2_s1":
-        from efficientformer import EFFICIENTFORMER_V2_S1 as Backbone
-    else:
-        raise NotImplementedError
-    return Backbone(config)
 
 
 def load_checkpoint(config: Box) -> dict:
@@ -59,14 +48,13 @@ def load_checkpoint(config: Box) -> dict:
 
 
 def random_input_constructor(input_res: int, dtype, device):
-    return {"x": torch.rand((2, *input_res))}
+    return {"x": torch.rand((1, *input_res), dtype=dtype, device=device)}
 
 
 def build_network(config: Box, state_dict: dict):
     report(f"Rank {config.world_rank}. Initializing model")
-    backbone = get_backbone(config)
-    
-    model = PatchnetModel(config=config, backbone=backbone)
+
+    model = LDAModel(config=config)
     
     with torch.no_grad():
         if config.world_rank == 0:

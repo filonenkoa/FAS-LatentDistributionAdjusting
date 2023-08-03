@@ -5,7 +5,7 @@ import sys
 from typing import Dict, List
 from box import Box
 import torch
-from torch.nn import Module
+from torch.nn import Module, CrossEntropyLoss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.distributed as dist
@@ -21,6 +21,7 @@ sys.path.append(Path(__file__).resolve().parents[1].as_posix())
 
 from metrics_counter import MetricsCounter
 from reporting import report
+from models.LDA import InterLoss, IntraLoss, DataLoss
 
 
 class Trainer(BaseTrainer):
@@ -39,11 +40,6 @@ class Trainer(BaseTrainer):
         # self.network = self.network.to(device)
         
         self.train_loss_metric = AvgMeter(writer=writer, name='Loss/train', num_iter_per_epoch=len(self.train_loader), per_iter_vis=True)
-        self.train_acc_metric = AvgMeter(writer=writer, name='Accuracy/train', num_iter_per_epoch=len(self.train_loader), per_iter_vis=True)
-
-        self.val_loss_metric = AvgMeter(writer=writer, name='Loss/val', num_iter_per_epoch=len(self.val_loaders))
-        self.val_acc_metric = AvgMeter(writer=writer, name='Accuracy/val', num_iter_per_epoch=len(self.val_loaders))
-        
         self.start_epoch = start_epoch
         
         self.epoch_time = AvgMeter(writer=writer, name="Epoch time, s", num_iter_per_epoch=1)
@@ -54,20 +50,23 @@ class Trainer(BaseTrainer):
         
         self.total_val_sets = len(self.config.dataset.val_set)
         
+        self.cls_loss = CrossEntropyLoss()
+        self.inter_loss = InterLoss(delta=config.loss.inter_delta)
+        self.intra_loss = IntraLoss(delta=config.loss.intra_delta)
+        self.data_loss = DataLoss(scale=config.loss.scale, margin=config.loss.margin)
+        
+        
     def save_model(self, epoch, val_metrics: ClassificationMetrics):
         file_name = Path(self.config.log_dir, f"{epoch:04d}_{self.config.model.base}_{val_metrics.acer:.4f}.pth")
         
-        model = self.network.module if dist.is_initialized() else self.network
+        model = self.network.module if dist.is_initialized() and self.config.world_size > 1 else self.network
 
         state = {
             'epoch': epoch,
             'model': model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             "scheduler": self.lr_scheduler.state_dict(),
-            # "loss": self.loss.state_dict(),
-            "val_loss": self.val_loss_metric.avg,
-            "val_acc": self.val_acc_metric.avg
-        }
+      }
         
         torch.save(state, file_name.as_posix())
 
@@ -93,62 +92,56 @@ class Trainer(BaseTrainer):
         prediction_counters_epoch = PredictionCounters()
         self.network.train()
         self.train_loss_metric.reset(epoch)
-        self.train_acc_metric.reset(epoch)
         max_num_batches = len(self.train_loader)
         
         iterator = enumerate(self.train_loader)
         if self.config.local_rank == 0:
             iterator = tqdm(iterator, desc=f"Training epoch {epoch}", total=max_num_batches)
             
-        for batch_index, (img1, img2, label) in iterator:
+        for batch_index, (img, label) in iterator:
             if self.lr_scheduler is not None and self.is_batch_scheduler:
                 self.lr_scheduler.step(epoch + (batch_index / max_num_batches))
-            img1, img2, label = img1.to(self.device), img2.to(self.device), label.to(self.device)
-            model = self.network.module if dist.is_initialized() else self.network
-            feature1 = model.get_descriptors(img1)
-            feature2 = model.get_descriptors(img2)
+            img, label = img.to(self.device), label.to(self.device)
+            model = self.network.module if dist.is_initialized() and self.config.world_size > 1 else self.network
+            
+            prediction, distance = model(img)
+            
+            loss = self.cls_loss(prediction, label)
+            pos, neg = model.read_prototype()
+            loss += self.inter_loss(pos, neg) * self.config.loss.inter_weight
+            loss += self.intra_loss(pos, neg) * self.config.loss.intra_weight / (self.config.model.num_prototypes * (self.config.model.num_prototypes + 1) / 2)
+            loss += self.data_loss(distance, label) * self.config.loss.data_weight / img.shape[0]
+
             self.optimizer.zero_grad()
-            loss = model.compute_loss(feature1, feature2, label)
             loss.backward()
             self.optimizer.step()
-
-            score1 = model.predict(feature1)
-            score2 = model.predict(feature2)
-            
-            label_squeezed = label.squeeze().type(torch.int8)
-
-            acc1 = calc_acc(score1, label_squeezed)
-            acc2 = calc_acc(score2, label_squeezed)
-            accuracy = (acc1 + acc2) / 2
             
             prediction_counters_batch = PredictionCounters()
-            self.update_prediction_counters(prediction_counters_batch, score1, label_squeezed)
+            self.update_prediction_counters(prediction_counters_batch, prediction, label)
             prediction_counters_epoch += prediction_counters_batch
             
             # Update metrics
             # batch_metrics = self.metrics_counter(prediction_counters_batch)
             epoch_metrics = self.metrics_counter(prediction_counters_epoch)
             
-            
             self.train_loss_metric.update(loss.item())
-            self.train_acc_metric.update(accuracy)
             if self.config.world_rank == 0:
                 lr = self.get_lr()
                 text = (
                     f"E: {epoch}, "
                     f"loss: {self.train_loss_metric.avg:.4f}, "
-                    f"acc: {self.train_acc_metric.avg*100:.2f}%, "
-                    f"ACER: {epoch_metrics.acer*100:.4f}%, "
-                    f"F1: {epoch_metrics.f1*100:.4f}%, "
-                    f"F3: {epoch_metrics.f3*100:.4f}%, "
-                    f"P: {epoch_metrics.precision*100:.4f}%, "
-                    f"R: {epoch_metrics.recall*100:.4f}%, "
-                    f"S: {epoch_metrics.specificity*100:.4f}%"
+                    f"ACER: {epoch_metrics.acer*100:.2f}%, "
+                    f"F1: {epoch_metrics.f1*100:.2f}%, "
+                    f"F3: {epoch_metrics.f3*100:.2f}%, "
+                    f"P: {epoch_metrics.precision*100:.2f}%, "
+                    f"R: {epoch_metrics.recall*100:.2f}%, "
+                    f"S: {epoch_metrics.specificity*100:.2f}%, "
                     f"LR: {lr:.4E}"
                     )
                 iterator.set_description(text)
                 globiter = epoch * max_num_batches + batch_index
-                self.writer.add_scalar("LR", lr, globiter) 
+                self.writer.add_scalar("LR", lr, globiter)
+                self.writer.add_scalar("Loss", loss.item(), globiter) 
                    
         if self.config.world_rank == 0:
             epoch_report = f"\nEpoch {epoch}, train metrics:\n{epoch_metrics}"
@@ -230,8 +223,6 @@ class Trainer(BaseTrainer):
             
     def validate(self, epoch) -> Dict[str, ClassificationMetrics]: # TODO: make it work with multiple GPUs
         self.network.eval()
-        # self.val_loss_metric.reset(epoch)
-        # self.val_acc_metric.reset(epoch)
         prediction_counters = {val_loader.dataset.name: PredictionCounters() for val_loader in self.val_loaders}
         tqdm_desc = f"Rank {self.config.world_rank}: Validating epoch {epoch}"
         tqdm_position = self.config.world_rank + 1
@@ -244,20 +235,17 @@ class Trainer(BaseTrainer):
         for val_loader in self.val_loaders:
             num_batches += len(val_loader)
         start_time = time.time()
-        batch_index_acc = 0
+        batch_index_acc = 0  # cumulative index for all val sets
         with torch.no_grad():
             for i, val_loader in tqdm_pbar:
-                
-                for batch_index, (img1, label) in enumerate(val_loader):
-                    
-                    img1, label = img1.to(self.device), label.to(self.device)
-                    model = self.network.module if dist.is_initialized() else self.network
-                    feature1 = model.get_descriptors(img1)
-                    score1 = model.predict(feature1)
-                    label_squeezed = label.squeeze().type(torch.int8)
+                for img, label in val_loader:
+                    img, label = img.to(self.device), label.to(self.device)
+                    model = self.network.module if dist.is_initialized() and self.config.world_size > 1 else self.network
+                    prediction, distance = model(img)
 
                     prediction_counters_batch = PredictionCounters()
-                    self.update_prediction_counters(prediction_counters_batch, score1, label_squeezed)
+                    label_squeezed = label.squeeze().type(torch.int8)
+                    self.update_prediction_counters(prediction_counters_batch, prediction, label_squeezed)
                     prediction_counters[val_loader.dataset.name] += prediction_counters_batch
                     batch_index_acc += 1
                     time_elapsed, time_left, time_eta = self.estimate_time(start_time, batch_index_acc, num_batches)
