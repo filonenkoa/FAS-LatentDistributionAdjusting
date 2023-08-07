@@ -42,6 +42,9 @@ class DistributedBalancedSampler(DistributedSampler):
         self.max_class_count = max(self.class_counts.values())
         self.total_samples_num = self._compute_total_num_samples()
         
+        if self.rank == 0:
+            report(f"Dataset {dataset.name}. Classes {self.class_counts}")
+        
     @staticmethod
     def _get_class_indices(dataset: Dataset) -> Dict[int, int]:
         class_indices = defaultdict(list)

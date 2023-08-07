@@ -48,13 +48,13 @@ train:
   balanced_sampler: True
 
 loss:
-  inter_delta: 1
-  intra_delta: 1
-  scale: 0.4
-  margin: 30.0
-  inter_weight: 1
-  intra_weight: 1
-  data_weight: 1
+  inter_delta: 0.258
+  intra_delta: 0.966
+  scale: 2
+  margin: 0.25
+  inter_weight: 0.01
+  intra_weight: 0.01
+  data_weight: 0.01
 
 val:
   batch_size: 1024

@@ -85,5 +85,6 @@ class ConcatDatasetWithLabels(ConcatDataset):
     def __init__(self, datasets: Iterable[Dataset]) -> None:
         super().__init__(datasets)
         self.labels = []
+        self.name = "Train"
         for dataset in self.datasets:
             self.labels.extend(dataset.labels)
