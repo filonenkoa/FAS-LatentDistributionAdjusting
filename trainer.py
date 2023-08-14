@@ -173,7 +173,6 @@ class Trainer(BaseTrainer):
 
     def update_best_metrics(self, val_metrics: Dict[str, ClassificationMetrics], epoch: int) -> None:
         if self.config.local_rank == 0:
-            print("!!!!!!!!!!!!", self.best_metrics)
             if float(val_metrics["total"].acer) < self.best_metrics.acer():
                 report(f"Validation ACER improved from {self.best_metrics.acer()*100:.4f}% to {val_metrics['total'].acer*100:.4f}%")
                 self.best_metrics.acer = BestMetric(val_metrics["total"].acer, epoch)
