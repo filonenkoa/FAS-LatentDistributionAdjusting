@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -105,3 +106,12 @@ class PredictionCounters:
             tn = tensor[2],
             fn = tensor[3]
         )
+
+
+@dataclass        
+class BestMetric:
+    value: float
+    epoch: int
+    
+    def __call__(self) -> float:
+        return self.value

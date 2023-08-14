@@ -69,7 +69,7 @@ def init_libraries(config: Box) -> None:
         torch.backends.cudnn.allow_tf32 = False
     
     config.device = torch.device("cuda")
-    config.device_name = torch.device("cuda")  # hardcoded, no CPU/HPU support
+    config.device_name = "cuda"  # hardcoded, no CPU/HPU support
 
 
 def init_communication(config: Box) -> None:
