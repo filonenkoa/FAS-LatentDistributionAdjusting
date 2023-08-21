@@ -80,26 +80,26 @@ def build_network(config: Box, state_dict: dict):
             if test_model.can_reparameterize:
                 rep_model = copy.deepcopy(test_model)
                 rep_model.reparameterize()
-            macs, params = get_model_complexity_info(
-                rep_model,
-                (3, config.dataset.crop_size, config.dataset.crop_size),
-                as_strings=False,
-                print_per_layer_stat=False,
-                verbose=False, input_constructor=input_constructor)
-            
-            test_input = input_constructor((3,224,224))["x"]
-            raw_output = test_model(test_input)
-            reparametrized_output = rep_model(test_input)
-            same_output = np.allclose(raw_output[0], reparametrized_output[0], atol=0.001)
-            if not same_output:
-                report("Reparametrized model produces different outputs", Severity.WARN)
+                macs, params = get_model_complexity_info(
+                    rep_model,
+                    (3, config.dataset.crop_size, config.dataset.crop_size),
+                    as_strings=False,
+                    print_per_layer_stat=False,
+                    verbose=False, input_constructor=input_constructor)
                 
-            rep_inference_speed = tech_inference_speed(rep_model, config.device, config.dataset.crop_size) * 1000
-            
-            del rep_model
-            report(f"🧠 Model parameters: {params/1_000_000:.3f} M  after reparametrization")
-            report(f"💻 Model complexity: {macs/1_000_000_000:.3f} GMACs after reparametrization")    
-            report(f"Average inference time for original and reparametrized models: {raw_inference_speed:.4f} and {rep_inference_speed:.4f} ms")
+                test_input = input_constructor((3,224,224))["x"]
+                raw_output = test_model(test_input)
+                reparametrized_output = rep_model(test_input)
+                same_output = np.allclose(raw_output[0], reparametrized_output[0], atol=0.001)
+                if not same_output:
+                    report("Reparametrized model produces different outputs", Severity.WARN)
+                    
+                rep_inference_speed = tech_inference_speed(rep_model, config.device, config.dataset.crop_size) * 1000
+                
+                del rep_model
+                report(f"🧠 Model parameters: {params/1_000_000:.3f} M  after reparametrization")
+                report(f"💻 Model complexity: {macs/1_000_000_000:.3f} GMACs after reparametrization")    
+                report(f"Average inference time for original and reparametrized models: {raw_inference_speed:.4f} and {rep_inference_speed:.4f} ms")
         
     if state_dict.get("model") is not None:
         model_raw = copy.deepcopy(model)
