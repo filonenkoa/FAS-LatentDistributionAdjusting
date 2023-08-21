@@ -7,6 +7,7 @@ The code base is rewritten from PyTorch Lightning to vanilla PyTorch to ensure t
 ## Improvements to the original repository
 - [x] Transfer from PyTorch Lightning to vanilla PyTorch
 - [x] EfficientFormerV2 support
+- [x] FastViT support
 - [x] Use config files
 - [x] Data augmentations
 - [x] TurboJPEG support for faster image decoding
@@ -16,6 +17,7 @@ The code base is rewritten from PyTorch Lightning to vanilla PyTorch to ensure t
 - [x] Compute metrics for each val dataset separately
 - [x] Split validation into miltiple GPUs
 - [x] Balanced sampler suitable for DDP
+- [x] Reparametrization efficiency evaluation for supported models
 - [ ] FP16/AMP support
 - [ ] Conversion to ONNX
 
