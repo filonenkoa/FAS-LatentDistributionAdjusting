@@ -57,6 +57,10 @@ class EfficientFormerV2Backbone(BaseModel):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(x)
+    
+    @property
+    def can_reparameterize(self) -> bool:
+        return False
 
 
 def EFFICIENTFORMER_V2_S0(config: Box=None):

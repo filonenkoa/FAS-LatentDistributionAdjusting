@@ -2,16 +2,19 @@ import copy
 from pathlib import Path
 import sys
 from box import Box
+import numpy as np
 import torch
 from ptflops import get_model_complexity_info
 from torch.nn.parallel import DistributedDataParallel as DDP
 from functools import partial
 from pathlib import Path
 
+from models.utils import tech_inference_speed
+
 sys.path.append(Path(__file__).resolve().parent.as_posix())
 sys.path.append(Path(__file__).resolve().parents[1].as_posix())
 from models.LDA import LDAModel
-from reporting import report
+from reporting import report, Severity
 
 
 def models_weights_difference_ratio(model_1: torch.nn.Module, model_2: torch.nn.Module) -> float:
@@ -48,7 +51,7 @@ def load_checkpoint(config: Box) -> dict:
 
 
 def random_input_constructor(input_res: int, dtype, device):
-    return {"x": torch.rand((1, *input_res), dtype=dtype, device=device)}
+    return {"x": torch.rand((1, *input_res), dtype=dtype, device=device, requires_grad=False)}
 
 
 def build_network(config: Box, state_dict: dict):
@@ -57,17 +60,46 @@ def build_network(config: Box, state_dict: dict):
     model = LDAModel(config=config)
     
     with torch.no_grad():
+        test_model = copy.deepcopy(model)
         if config.world_rank == 0:
-            model.eval()
-            input_constructor = partial(random_input_constructor, dtype=next(model.parameters()).dtype, device=next(model.parameters()).device)
+            test_model.eval()
+            input_constructor = partial(random_input_constructor, dtype=next(test_model.parameters()).dtype, device=next(test_model.parameters()).device)
             macs, params = get_model_complexity_info(
-                model,
+                test_model,
                 (3, config.dataset.crop_size, config.dataset.crop_size),
                 as_strings=False,
                 print_per_layer_stat=False,
                 verbose=False, input_constructor=input_constructor)
             report(f"🧠 Model parameters: {params/1_000_000:.3f} M")
             report(f"💻 Model complexity: {macs/1_000_000_000:.3f} GMACs")
+            
+            raw_inference_speed = tech_inference_speed(test_model, config.device, config.dataset.crop_size) * 1000
+            report(f"Average inference time the original model: {raw_inference_speed:.4f} ms")
+        
+            
+            if test_model.can_reparameterize:
+                rep_model = copy.deepcopy(test_model)
+                rep_model.reparameterize()
+            macs, params = get_model_complexity_info(
+                rep_model,
+                (3, config.dataset.crop_size, config.dataset.crop_size),
+                as_strings=False,
+                print_per_layer_stat=False,
+                verbose=False, input_constructor=input_constructor)
+            
+            test_input = input_constructor((3,224,224))["x"]
+            raw_output = test_model(test_input)
+            reparametrized_output = rep_model(test_input)
+            same_output = np.allclose(raw_output[0], reparametrized_output[0], atol=0.001)
+            if not same_output:
+                report("Reparametrized model produces different outputs", Severity.WARN)
+                
+            rep_inference_speed = tech_inference_speed(rep_model, config.device, config.dataset.crop_size) * 1000
+            
+            del rep_model
+            report(f"🧠 Model parameters: {params/1_000_000:.3f} M  after reparametrization")
+            report(f"💻 Model complexity: {macs/1_000_000_000:.3f} GMACs after reparametrization")    
+            report(f"Average inference time for original and reparametrized models: {raw_inference_speed:.4f} and {rep_inference_speed:.4f} ms")
         
     if state_dict.get("model") is not None:
         model_raw = copy.deepcopy(model)

@@ -5,6 +5,7 @@ logs
 __pycache__
 .env
 *.pth
+*.pth.tar
 
 bizon_s1.sh
 bizon_s1.yaml
