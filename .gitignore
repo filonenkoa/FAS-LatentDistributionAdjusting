@@ -6,5 +6,5 @@ __pycache__
 .env
 *.pth
 
-bison_s1.sh
-bison_s1.yaml
+bizon_s1.sh
+bizon_s1.yaml
