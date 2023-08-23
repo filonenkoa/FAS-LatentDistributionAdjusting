@@ -1,3 +1,4 @@
+import csv
 import os
 from pathlib import Path
 from random import randint
@@ -184,11 +185,36 @@ class Trainer(BaseTrainer):
                 self.best_metrics.f1 = BestMetric(val_metrics["total"].f1, epoch)
             
 
-            
+    def log_val_metrics_csv(self, val_metrics: ClassificationMetrics, epoch: int):
+        csv_log_file_path = Path(self.config.log_dir, "val_metrics.csv")
+        if not csv_log_file_path.is_file():
+            header = ["Epoch", "F3↑", "F1↑", "ACER↑", "Precision↑", "Recall↑", "Specificity↑", "APCER↑", "BPCER↑", "threshold"]
+            with open(csv_log_file_path, "a") as f:
+                writer = csv.writer(f)
+                writer.writerow(header)
+
+        row = [
+            epoch,
+            f"{val_metrics.f3:.15f}",
+            f"{val_metrics.f1:.15f}",
+            f"{val_metrics.acer:.15f}",
+            f"{val_metrics.precision:.15f}",
+            f"{val_metrics.recall:.15f}",
+            f"{val_metrics.specificity:.15f}",
+            f"{val_metrics.apcer:.15f}",
+            f"{val_metrics.bpcer:.15f}",
+            f"{val_metrics.threshold:.15f}"]
+
+        with open(csv_log_file_path, "a") as f:
+                writer = csv.writer(f)
+                writer.writerow(row)
+
+
     def train(self):
         if self.config.train.val_before_train:
             epoch = -1
             val_metrics = self.validate(epoch)
+            self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=-1)
             self.update_best_metrics(val_metrics, epoch)
         if dist.is_initialized():
             dist.barrier()
@@ -209,6 +235,7 @@ class Trainer(BaseTrainer):
             if dist.is_initialized():
                 dist.barrier()
             val_metrics = self.validate(epoch)
+            self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=epoch)
             if self.config.world_rank == 0:
                 self.update_best_metrics(val_metrics, epoch)
                 
