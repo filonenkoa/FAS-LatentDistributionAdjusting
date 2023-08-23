@@ -54,7 +54,7 @@ def random_input_constructor(input_res: int, dtype, device):
     return {"x": torch.rand((1, *input_res), dtype=dtype, device=device, requires_grad=False)}
 
 
-def build_network(config: Box, state_dict: dict):
+def build_network(config: Box, state_dict: dict) -> LDAModel:
     report(f"Rank {config.world_rank}. Initializing model")
 
     model = LDAModel(config=config)

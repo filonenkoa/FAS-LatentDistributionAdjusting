@@ -18,8 +18,7 @@ The code base is rewritten from PyTorch Lightning to vanilla PyTorch to ensure t
 - [x] Split validation into miltiple GPUs
 - [x] Balanced sampler suitable for DDP
 - [x] Reparametrization efficiency evaluation for supported models
-- [ ] FP16/AMP support
-- [ ] Conversion to ONNX
+- [x] Conversion to ONNX
 
 ## How to use
 

@@ -5,6 +5,8 @@ numpy
 opencv_python
 opencv_python_headless
 pandas
+onnx
+onnxruntime
 torch
 torchvision
 tqdm
