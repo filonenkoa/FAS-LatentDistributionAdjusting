@@ -39,7 +39,7 @@ def get_backbone(config: Box) -> torch.nn.Module:
     return Backbone(config)
 
 
-def tech_inference_speed(input_model, device: str | torch.device = "cpu", input_size: int = 224, iterations: int = 1000):
+def test_inference_speed(input_model, device: str | torch.device = "cpu", input_size: int = 224, iterations: int = 1000):
     # cuDnn configurations
     actual_cuddn_benchmark = torch.backends.cudnn.benchmark
     actual_cudnn_deterministic = torch.backends.cudnn.deterministic

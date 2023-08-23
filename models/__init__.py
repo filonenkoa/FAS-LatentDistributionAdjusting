@@ -9,7 +9,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from functools import partial
 from pathlib import Path
 
-from models.utils import tech_inference_speed
+from models.utils import test_inference_speed
 
 sys.path.append(Path(__file__).resolve().parent.as_posix())
 sys.path.append(Path(__file__).resolve().parents[1].as_posix())
@@ -73,7 +73,7 @@ def build_network(config: Box, state_dict: dict):
             report(f"🧠 Model parameters: {params/1_000_000:.3f} M")
             report(f"💻 Model complexity: {macs/1_000_000_000:.3f} GMACs")
             
-            raw_inference_speed = tech_inference_speed(test_model, config.device, config.dataset.crop_size) * 1000
+            raw_inference_speed = test_inference_speed(test_model, config.device, config.dataset.crop_size) * 1000
             report(f"Average inference time the original model: {raw_inference_speed:.4f} ms")
         
             
@@ -94,7 +94,7 @@ def build_network(config: Box, state_dict: dict):
                 if not same_output:
                     report("Reparametrized model produces different outputs", Severity.WARN)
                     
-                rep_inference_speed = tech_inference_speed(rep_model, config.device, config.dataset.crop_size) * 1000
+                rep_inference_speed = test_inference_speed(rep_model, config.device, config.dataset.crop_size) * 1000
                 
                 del rep_model
                 report(f"🧠 Model parameters: {params/1_000_000:.3f} M  after reparametrization")
