@@ -14,3 +14,4 @@ python-dotenv
 PyTurboJPEG
 tensorboard
 timm==0.6.13
+wget
