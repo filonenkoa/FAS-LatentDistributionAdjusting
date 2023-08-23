@@ -83,12 +83,10 @@ class FastVitBackbone(BaseModel):
                                                drop_path_rate=drop_path_rate)
         if self.config.model.pretrained:
             if not metadata.pretrained_path.is_file():
-                report("Could not find a pretrained checlpoint. Downloading", severity=Severity.WARN)
+                report("Could not find a pretrained checkpoint. Downloading", severity=Severity.WARN)
                 import wget
                 response = wget.download(metadata.download_link, metadata.pretrained_path.as_posix())
             state_dict = torch.load(metadata.pretrained_path)
-            # del state_dict["state_dict"]["head.weight"]
-            # del state_dict["state_dict"]["head.bias"]
             self.backbone.load_state_dict(state_dict["state_dict"])
 
         input_neurons = self.backbone.head.weight.shape[1]
