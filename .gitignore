@@ -7,7 +7,4 @@ __pycache__
 *.pth
 *.pth.tar
 
-bizon_s1.sh
-bizon_s1.yaml
-bizon_fastvit_s12.sh
-bizon_fastvit_s12.yaml
+*bizon*

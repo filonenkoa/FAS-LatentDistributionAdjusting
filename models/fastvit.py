@@ -82,10 +82,12 @@ class FastVitBackbone(BaseModel):
                                                drop_rate=drop_rate,
                                                drop_path_rate=drop_path_rate)
         if self.config.model.pretrained:
-            if not metadata.pretrained_path.is_file():
-                report("Could not find a pretrained checkpoint. Downloading", severity=Severity.WARN)
+            if not metadata.pretrained_path.is_file() and self.config.local_rank == 0:
+                report(f"Could not find a pretrained checkpoint at {metadata.pretrained_path.absolute().as_posix()}. Downloading", severity=Severity.WARN)
                 import wget
                 response = wget.download(metadata.download_link, metadata.pretrained_path.as_posix())
+            if self.config.world_size > 1:
+                dist.barrier()
             state_dict = torch.load(metadata.pretrained_path)
             self.backbone.load_state_dict(state_dict["state_dict"])
 
