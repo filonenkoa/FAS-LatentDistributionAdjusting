@@ -14,6 +14,7 @@ sys.path.append(root_path)
 
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from base_model import BaseModel
 from torch.nn import Module
 
