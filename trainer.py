@@ -186,6 +186,8 @@ class Trainer(BaseTrainer):
             
 
     def log_val_metrics_csv(self, val_metrics: ClassificationMetrics, epoch: int):
+        if self.config.local_rank != 0:
+            return
         csv_log_file_path = Path(self.config.log_dir, "val_metrics.csv")
         if not csv_log_file_path.is_file():
             header = ["Epoch", "F3↑", "F1↑", "ACER↑", "Precision↑", "Recall↑", "Specificity↑", "APCER↑", "BPCER↑", "threshold"]
@@ -214,7 +216,8 @@ class Trainer(BaseTrainer):
         if self.config.train.val_before_train:
             epoch = -1
             val_metrics = self.validate(epoch)
-            self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=-1)
+            if self.config.local_rank == 0:
+                self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=-1)
             self.update_best_metrics(val_metrics, epoch)
         if dist.is_initialized():
             dist.barrier()
@@ -235,10 +238,10 @@ class Trainer(BaseTrainer):
             if dist.is_initialized():
                 dist.barrier()
             val_metrics = self.validate(epoch)
-            self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=epoch)
+
             if self.config.world_rank == 0:
                 self.update_best_metrics(val_metrics, epoch)
-                
+                self.log_val_metrics_csv(val_metrics=val_metrics["total"], epoch=epoch)
                 self.save_model(epoch, val_metrics["total"])
                 epoch_time = time.time() - epoch_start_time
                 self.epoch_time.update(epoch_time)
