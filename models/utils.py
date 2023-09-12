@@ -55,12 +55,12 @@ def test_inference_speed(input_model, device: str | torch.device = "cpu", input_
     for i in tqdm(range(iterations+1), desc="Testing inference time"):
         random_input = torch.randn(1,3,input_size,input_size).to(device)
         torch.cuda.synchronize()
-        tic = time.time()
+        tic = time.perf_counter()
         model(random_input)
         torch.cuda.synchronize()
         # the first iteration time cost much higher, so exclude the first iteration
         #print(time.time()-tic)
-        time_list.append(time.time()-tic)
+        time_list.append(time.perf_counter()-tic)
     time_list = time_list[1:]
     
     torch.backends.cudnn.benchmark = actual_cuddn_benchmark

@@ -20,7 +20,7 @@ class BaseModel(Module, metaclass=ABCMeta):
     
     def reparameterize(self) -> Module:
         if not self.can_reparameterize:
-            raise Exception("Reparameterization is not support for the current model")
+            raise Exception("Reparameterization is not supported for the current model")
         return self._reparameterize()
     
     def _reparameterize(self) -> Module:

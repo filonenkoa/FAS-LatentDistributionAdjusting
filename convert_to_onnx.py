@@ -83,6 +83,11 @@ if __name__ == "__main__":
         model.reparameterize()  # should be called in the train mode
     model.eval()
     
+    onnx_path = Path(args.checkpoint).parent / Path(f"{Path(args.checkpoint).stem}_b1.onnx")
+    report("Converting with dynamic batch size")
+    convert_to_onnx(config, onnx_path, batch_size=1)
+    report("Done")
+        
     onnx_path = Path(args.checkpoint).parent / Path(f"{Path(args.checkpoint).stem}_dyn.onnx")
     report("Converting with dynamic batch size")
     convert_to_onnx(config, onnx_path, batch_size=4)
