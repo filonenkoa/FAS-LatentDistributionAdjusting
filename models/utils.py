@@ -66,4 +66,4 @@ def test_inference_speed(input_model, device: str | torch.device = "cpu", input_
     torch.backends.cudnn.benchmark = actual_cuddn_benchmark
     torch.backends.cudnn.deterministic = actual_cudnn_deterministic
     
-    return sum(time_list)/10000
+    return sum(time_list)/iterations
